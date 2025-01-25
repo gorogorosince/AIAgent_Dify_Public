@@ -19,16 +19,18 @@ class DifyClient:
             "inputs": {},
             "query": message,
             "user": "default_user",
+            "response_mode": "blocking",
             "conversation_id": conversation_id if conversation_id else None
         }
 
         try:
             async with httpx.AsyncClient() as client:
-                print(f"Sending request to Dify API: {self.base_url}/chat-messages")
+                endpoint = f"{self.base_url}/chat-messages"
+                print(f"Sending request to Dify API: {endpoint}")
                 print(f"Payload: {payload}")
                 print(f"Headers: {headers}")
                 response = await client.post(
-                    f"{self.base_url}/chat-messages",
+                    endpoint,
                     headers=headers,
                     json=payload,
                     timeout=30.0

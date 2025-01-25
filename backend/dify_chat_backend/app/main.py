@@ -72,12 +72,21 @@ async def chat(
             )
             print(f"Dify API Response: {dify_response}")
 
+            # Extract the response data
+            answer = dify_response.get("answer", "")
+            if not answer and isinstance(dify_response.get("message"), dict):
+                answer = dify_response.get("message", {}).get("content", "")
+            
+            conv_id = dify_response.get("conversation_id", "")
+            if not conv_id:
+                conv_id = dify_response.get("id", str(uuid.uuid4()))
+
             # Create new conversation record
             conversation = Conversation(
                 id=str(uuid.uuid4()),
                 user_message=request.message,
-                assistant_message=dify_response.get("answer", ""),
-                conversation_id=dify_response.get("conversation_id", str(uuid.uuid4())),
+                assistant_message=answer,
+                conversation_id=conv_id,
                 timestamp=datetime.utcnow()
             )
 
