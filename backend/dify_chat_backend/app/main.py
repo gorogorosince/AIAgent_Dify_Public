@@ -63,32 +63,35 @@ async def chat(
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        try:
-            print(f"Received chat request: {request}")
-            # Call Dify API
-            dify_response = await dify_client.chat(
-                message=request.message,
-                conversation_id=request.conversation_id
-            )
-            print(f"Dify API Response: {dify_response}")
+        print(f"Received chat request: {request}")
+        # Call Dify API
+        dify_response = await dify_client.chat(
+            message=request.message,
+            conversation_id=request.conversation_id
+        )
+        print(f"Dify API Response: {dify_response}")
 
-            # Extract the response data
-            print(f"Raw Dify response: {dify_response}")
-            answer = ""
-            if isinstance(dify_response, dict):
-                answer = (
-                    dify_response.get("answer", "") or
-                    dify_response.get("response", "") or
-                    dify_response.get("message", {}).get("content", "") if isinstance(dify_response.get("message"), dict) else ""
-                )
+        # Extract response data with better error handling
+        answer = ""
+        conv_id = str(uuid.uuid4())  # Default to new UUID
+
+        if isinstance(dify_response, dict):
+            # Try different possible response structures
+            answer = (
+                dify_response.get("answer", "") or
+                dify_response.get("response", "") or
+                dify_response.get("text", "") or
+                dify_response.get("message", {}).get("content", "") 
+                if isinstance(dify_response.get("message"), dict) else ""
+            )
             
             conv_id = (
                 dify_response.get("conversation_id", "") or
                 dify_response.get("id", "") or
-                str(uuid.uuid4())
+                conv_id  # Fall back to generated UUID
             )
 
-            # Create new conversation record
+        # Create new conversation record
             conversation = Conversation(
                 id=str(uuid.uuid4()),
                 user_message=request.message,
