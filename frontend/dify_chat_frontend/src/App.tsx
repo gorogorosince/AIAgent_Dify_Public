@@ -118,35 +118,30 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-amber-50">
-      <div className="container mx-auto p-4">
-        <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-xl">
-          <div className="h-screen max-h-96 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-amber-200 scrollbar-track-amber-50">
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto p-6">
+        <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-lg">
+          <div className="h-screen max-h-96 overflow-y-auto p-8 space-y-8 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
             {messages.map((message, index) => (
               <div
                 key={index}
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`p-4 rounded-lg max-w-[80%] shadow-sm ${
+                <div className={`p-4 rounded-2xl max-w-[80%] shadow-sm ${
                   message.role === 'user'
-                    ? 'bg-amber-100 text-gray-800'
-                    : 'bg-orange-50 text-gray-800'
+                    ? 'bg-gray-50 text-gray-700'
+                    : 'bg-gray-100 text-gray-700'
                 }`}>
-                  <div>
-                    <p className="mb-2 leading-relaxed whitespace-pre-wrap">{message.content}</p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(message.timestamp).toLocaleString('ja-JP')}
-                    </p>
-                  </div>
+                  <p className="leading-relaxed whitespace-pre-wrap">{message.content}</p>
                 </div>
               </div>
             ))}
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-orange-50 p-4 rounded-lg max-w-[80%] text-gray-800 shadow-sm">
+                <div className="bg-gray-100 p-4 rounded-2xl max-w-[80%] text-gray-700 shadow-sm">
                   <p className="flex items-center">
                     <span className="mr-2">応答を生成中</span>
-                    <span className="animate-pulse text-amber-600">...</span>
+                    <span className="animate-pulse text-gray-500">...</span>
                   </p>
                 </div>
               </div>
@@ -160,13 +155,13 @@ function App() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
                 placeholder="メッセージを入力..."
-                className="flex-1 p-3 bg-amber-50 text-gray-800 border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent placeholder-amber-500"
+                className="flex-1 p-3 bg-gray-50 text-gray-700 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent placeholder-gray-400"
                 disabled={isLoading}
               />
               <button
                 onClick={sendMessage}
                 disabled={isLoading}
-                className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors duration-200 font-medium shadow-sm"
+                className="px-6 py-3 bg-gray-700 text-white rounded-2xl hover:bg-gray-800 disabled:opacity-50 transition-colors duration-200 font-medium shadow-sm"
               >
                 送信
               </button>
