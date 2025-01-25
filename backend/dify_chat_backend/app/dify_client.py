@@ -20,12 +20,13 @@ class DifyClient:
             "query": message,
             "user": "default_user",
             "response_mode": "blocking",
-            "conversation_id": conversation_id if conversation_id else None
+            "conversation_id": conversation_id if conversation_id else None,
+            "stream": False
         }
 
         try:
             async with httpx.AsyncClient() as client:
-                endpoint = f"{self.base_url}/chat-messages"
+                endpoint = f"{self.base_url}/v1/chat-messages"
                 print(f"Sending request to Dify API: {endpoint}")
                 print(f"Payload: {payload}")
                 print(f"Headers: {headers}")
