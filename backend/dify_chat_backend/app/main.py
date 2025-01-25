@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel
 import os
+import httpx
 from dotenv import load_dotenv
 
 from .database import init_db, async_session, Conversation
