@@ -63,32 +63,38 @@ async def chat(
 ):
     try:
         try:
+            print(f"Received chat request: {request}")
             # Call Dify API
             dify_response = await dify_client.chat(
                 message=request.message,
                 conversation_id=request.conversation_id
             )
+            print(f"Dify API Response: {dify_response}")
 
             # Create new conversation record
             conversation = Conversation(
                 id=str(uuid.uuid4()),
                 user_message=request.message,
-                assistant_message=dify_response["answer"],
-                conversation_id=dify_response["conversation_id"],
+                assistant_message=dify_response.get("answer", ""),
+                conversation_id=dify_response.get("conversation_id", str(uuid.uuid4())),
                 timestamp=datetime.utcnow()
             )
+
+            db.add(conversation)
+            await db.commit()
+            await db.refresh(conversation)
+
+            print(f"Created conversation record: {conversation.id}")
+            return ChatResponse(
+                conversation_id=conversation.conversation_id,
+                message=conversation.assistant_message,
+                timestamp=conversation.timestamp
+            )
         except Exception as e:
-            print(f"Dify API Error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Dify API Error: {str(e)}")
-
-        db.add(conversation)
-        await db.commit()
-
-        return ChatResponse(
-            conversation_id=conversation.conversation_id,
-            message=conversation.assistant_message,
-            timestamp=conversation.timestamp
-        )
+            print(f"Error in chat endpoint: {str(e)}")
+            if isinstance(e, httpx.HTTPError):
+                print(f"HTTP Error response: {e.response.content if hasattr(e, 'response') else 'No response content'}")
+            raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

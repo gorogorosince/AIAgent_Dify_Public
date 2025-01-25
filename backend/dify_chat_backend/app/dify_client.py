@@ -19,9 +19,7 @@ class DifyClient:
             "inputs": {},
             "query": message,
             "user": "default_user",
-            "response_mode": "blocking",
-            "conversation_id": conversation_id if conversation_id else None,
-            "stream": False
+            "conversation_id": conversation_id if conversation_id else None
         }
 
         try:
