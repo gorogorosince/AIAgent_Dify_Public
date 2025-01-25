@@ -1,6 +1,8 @@
 import httpx
 import os
-from typing import Optional
+import json
+import uuid
+from typing import Optional, Dict, AsyncGenerator
 
 class DifyClient:
     def __init__(self):
@@ -9,16 +11,18 @@ class DifyClient:
         if not self.api_key:
             raise ValueError("DIFY_API_KEY must be set")
 
-    async def chat(self, message: str, conversation_id: Optional[str] = None) -> dict:
+    async def chat(self, message: str, conversation_id: Optional[str] = None) -> Dict[str, str]:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream"
         }
         
         payload = {
             "inputs": {},
             "query": message,
-            "user": "default-user",  # Required field according to API error
+            "user": "default-user",
+            "response_mode": "streaming",
             "conversation_id": conversation_id if conversation_id else None
         }
         
@@ -30,21 +34,57 @@ class DifyClient:
                 print(f"Sending request to Dify API: {endpoint}")
                 print(f"Payload: {payload}")
                 print(f"Headers: {headers}")
-                response = await client.post(
+                
+                async with client.stream(
+                    "POST",
                     endpoint,
                     headers=headers,
                     json=payload,
                     timeout=30.0
-                )
-                response.raise_for_status()
-                
-                data = response.json()
-                print(f"Dify API Response: {data}")
-                
-                return {
-                    "answer": data.get("answer", ""),
-                    "conversation_id": data.get("conversation_id", "")
-                }
+                ) as response:
+                    response.raise_for_status()
+                    
+                    full_response = ""
+                    current_conversation_id = None
+                    
+                    async for line in response.aiter_lines():
+                        print(f"Received line: {line}")
+                        if not line.strip():
+                            continue
+                            
+                        if line.startswith("data: "):
+                            data = line[6:].strip()  # Remove "data: " prefix
+                            if data == "[DONE]":
+                                break
+                                
+                            try:
+                                chunk = json.loads(data)
+                                print(f"Parsed chunk: {chunk}")
+                                if isinstance(chunk, dict):
+                                    message_data = chunk.get("answer", "")
+                                    if message_data:
+                                        full_response += message_data
+                                    
+                                    # Try to get conversation_id from various locations
+                                    if not current_conversation_id:
+                                        current_conversation_id = (
+                                            chunk.get("conversation_id") or
+                                            chunk.get("id") or
+                                            (chunk.get("data", {}).get("conversation_id") if isinstance(chunk.get("data"), dict) else None)
+                                        )
+                            except json.JSONDecodeError as e:
+                                print(f"Error parsing chunk: {e}")
+                                continue
+                    
+                    # If we didn't get a conversation_id, generate one
+                    if not current_conversation_id:
+                        current_conversation_id = str(uuid.uuid4())
+                    
+                    return {
+                        "answer": full_response.strip(),
+                        "conversation_id": current_conversation_id
+                    }
+                    
         except httpx.HTTPError as e:
             print(f"HTTP Error: {str(e)}")
             print(f"Response content: {e.response.content if hasattr(e, 'response') else 'No response content'}")

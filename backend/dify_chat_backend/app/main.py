@@ -64,58 +64,37 @@ async def chat(
 ):
     try:
         print(f"Received chat request: {request}")
-        # Call Dify API
+        
+        # Call Dify API with streaming mode
         dify_response = await dify_client.chat(
             message=request.message,
             conversation_id=request.conversation_id
         )
         print(f"Dify API Response: {dify_response}")
 
-        # Extract response data with better error handling
-        answer = ""
-        conv_id = str(uuid.uuid4())  # Default to new UUID
-
-        if isinstance(dify_response, dict):
-            # Try different possible response structures
-            answer = (
-                dify_response.get("answer", "") or
-                dify_response.get("response", "") or
-                dify_response.get("text", "") or
-                dify_response.get("message", {}).get("content", "") 
-                if isinstance(dify_response.get("message"), dict) else ""
-            )
-            
-            conv_id = (
-                dify_response.get("conversation_id", "") or
-                dify_response.get("id", "") or
-                conv_id  # Fall back to generated UUID
-            )
-
         # Create new conversation record
-            conversation = Conversation(
-                id=str(uuid.uuid4()),
-                user_message=request.message,
-                assistant_message=answer,
-                conversation_id=conv_id,
-                timestamp=datetime.utcnow()
-            )
+        conversation = Conversation(
+            id=str(uuid.uuid4()),
+            user_message=request.message,
+            assistant_message=dify_response["answer"],
+            conversation_id=dify_response["conversation_id"] or str(uuid.uuid4()),
+            timestamp=datetime.utcnow()
+        )
 
-            db.add(conversation)
-            await db.commit()
-            await db.refresh(conversation)
+        db.add(conversation)
+        await db.commit()
+        await db.refresh(conversation)
 
-            print(f"Created conversation record: {conversation.id}")
-            return ChatResponse(
-                conversation_id=conversation.conversation_id,
-                message=conversation.assistant_message,
-                timestamp=conversation.timestamp
-            )
-        except Exception as e:
-            print(f"Error in chat endpoint: {str(e)}")
-            if isinstance(e, httpx.HTTPError):
-                print(f"HTTP Error response: {e.response.content if hasattr(e, 'response') else 'No response content'}")
-            raise HTTPException(status_code=500, detail=str(e))
+        print(f"Created conversation record: {conversation.id}")
+        return ChatResponse(
+            conversation_id=conversation.conversation_id,
+            message=conversation.assistant_message,
+            timestamp=conversation.timestamp
+        )
     except Exception as e:
+        print(f"Error in chat endpoint: {str(e)}")
+        if isinstance(e, httpx.HTTPError):
+            print(f"HTTP Error response: {e.response.content if hasattr(e, 'response') else 'No response content'}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/chat/history", response_model=List[ConversationResponse])
