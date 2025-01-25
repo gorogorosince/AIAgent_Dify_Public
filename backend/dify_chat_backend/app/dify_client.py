@@ -18,6 +18,7 @@ class DifyClient:
         payload = {
             "inputs": {},
             "query": message,
+            "user": "default-user",  # Required field according to API error
             "response_mode": "blocking",
             "conversation_id": conversation_id if conversation_id else None,
             "stream": False
