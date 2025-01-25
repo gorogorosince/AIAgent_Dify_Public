@@ -13,6 +13,7 @@ python-dotenv = "^1.0.1"
 httpx = "^0.28.1"
 sqlalchemy = "^2.0.37"
 aiosqlite = "^0.20.0"
+uvicorn = "^0.34.0"
 
 
 [build-system]
