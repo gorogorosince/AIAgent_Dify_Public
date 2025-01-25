@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, desc
 import uuid
 from datetime import datetime
 from typing import Optional, List
@@ -104,10 +105,13 @@ async def get_chat_history(
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        query = db.query(Conversation)
+        stmt = select(Conversation)
         if before:
-            query = query.filter(Conversation.timestamp < before)
-        conversations = await query.order_by(Conversation.timestamp.desc()).limit(limit).all()
+            stmt = stmt.where(Conversation.timestamp < before)
+        stmt = stmt.order_by(desc(Conversation.timestamp)).limit(limit)
+        
+        result = await db.execute(stmt)
+        conversations = result.scalars().all()
         
         return [
             ConversationResponse(

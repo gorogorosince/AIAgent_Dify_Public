@@ -1,9 +1,11 @@
 [tool.poetry]
 name = "app"
 version = "0.1.0"
-description = ""
+description = "Dify Chat Backend Service"
 authors = ["Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>"]
 readme = "README.md"
+packages = [{include = "app"}]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -14,6 +16,8 @@ httpx = "^0.28.1"
 sqlalchemy = "^2.0.37"
 aiosqlite = "^0.20.0"
 uvicorn = "^0.34.0"
+pydantic = "^2.10.6"
+typing-extensions = "^4.12.2"
 
 
 [build-system]
