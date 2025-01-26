@@ -11,17 +11,26 @@ class DifyClient:
         if not self.api_key:
             raise ValueError("DIFY_API_KEY must be set")
 
-    async def chat(self, message: str, conversation_id: Optional[str] = None) -> Dict[str, str]:
+    async def chat(
+        self,
+        message: str,
+        conversation_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        source: str = "web"
+    ) -> Dict[str, str]:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
             "Accept": "text/event-stream"
         }
         
+        # Generate a unique user identifier based on source and user_id
+        user_identifier = f"{source}-{user_id}" if user_id else "default-user"
+        
         payload = {
             "inputs": {},
             "query": message,
-            "user": "default-user",
+            "user": user_identifier,
             "response_mode": "streaming",
             "conversation_id": conversation_id if conversation_id else None
         }

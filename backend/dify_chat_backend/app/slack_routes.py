@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from .database import async_session, SlackWorkspace, SlackChannel, SlackMessage
 from .slack_client import SlackClient
+from .dify_client import DifyClient
 import secrets
 import hashlib
 import hmac
@@ -14,6 +15,7 @@ from typing import Dict, Optional, Any
 
 router = APIRouter()
 slack_client = SlackClient()
+dify_client = DifyClient()
 
 # Dictionary to store state parameters and their creation timestamps
 state_store: Dict[str, float] = {}
@@ -201,6 +203,42 @@ async def slack_events(
                 message.conversation_id = conversation_id
                 await db.commit()
                 
+                # Forward message to Dify
+                try:
+                    dify_response = await dify_client.chat(
+                        message=text,
+                        conversation_id=message.conversation_id,
+                        user_id=user_id,
+                        source="slack"
+                    )
+                    print(f"Dify response: {dify_response}")
+                    
+                    # Send response back to Slack
+                    await slack_client.post_message(
+                        token=workspace.access_token,
+                        channel=channel_id,
+                        text=dify_response["answer"],
+                        thread_ts=thread_ts or ts  # Reply in thread if exists, otherwise create new thread
+                    )
+                    
+                    # Store Dify's response
+                    dify_message = SlackMessage(
+                        id=str(uuid.uuid4()),
+                        channel_id=channel_id,
+                        user_id=workspace.bot_user_id,  # Use bot's user ID
+                        text=dify_response["answer"],
+                        ts=str(time.time()),
+                        thread_ts=thread_ts or ts,  # Reply in thread if exists, otherwise create new thread
+                        conversation_id=message.conversation_id,
+                        created_at=datetime.utcnow()
+                    )
+                    db.add(dify_message)
+                    await db.commit()
+                    
+                except Exception as e:
+                    print(f"Error getting Dify response: {str(e)}")
+                    # Continue without failing the request
+                
                 return {"ok": True}
                 
             except Exception as e:
@@ -239,10 +277,25 @@ async def slack_events(
             db.add(message)
             await db.commit()
             
-            return {
-                "response_type": "in_channel",
-                "text": "処理中です..."  # "Processing..."
-            }
+            # Forward command to Dify
+            try:
+                dify_response = await dify_client.chat(
+                    message=f"{command} {text}".strip(),
+                    conversation_id=message.conversation_id,
+                    user_id=user_id,
+                    source="slack"
+                )
+                
+                return {
+                    "response_type": "in_channel",
+                    "text": dify_response["answer"]
+                }
+            except Exception as e:
+                print(f"Error getting Dify response for command: {str(e)}")
+                return {
+                    "response_type": "ephemeral",
+                    "text": "申し訳ありませんが、エラーが発生しました。もう一度お試しください。"
+                }
             
         except Exception as e:
             print(f"Error processing slash command: {str(e)}")
