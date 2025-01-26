@@ -69,6 +69,24 @@ class SlackMessage(Base):
     channel = relationship("SlackChannel", backref="messages")
     conversation = relationship("Conversation", backref="slack_messages")
 
+import pathlib
+import os
+
 async def init_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """Initialize the database and ensure data directory exists with proper permissions."""
+    # Ensure data directory exists with proper permissions
+    data_dir = pathlib.Path('/data')
+    try:
+        data_dir.mkdir(exist_ok=True, parents=True)
+        # Set permissions to allow nobody user to write
+        os.chmod(data_dir, 0o777)
+    except Exception as e:
+        print(f"Error creating data directory: {e}")
+    
+    try:
+        # Create database tables
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as e:
+        print(f"Error creating database tables: {e}")
+        raise
