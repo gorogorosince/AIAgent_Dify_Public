@@ -98,7 +98,7 @@ def test_slack_events_url_verification(test_client):
     )
     
     assert response.status_code == 200
-    assert response.json() == {"challenge": challenge}
+    assert response.text == challenge
 
 @patch('app.slack_routes.slack_client.post_message')
 @patch('app.dify_client.DifyClient.chat')

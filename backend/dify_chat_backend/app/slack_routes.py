@@ -134,7 +134,7 @@ async def slack_oauth_callback(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
 @router.post("/slack/events")
 async def slack_events(
@@ -155,11 +155,11 @@ async def slack_events(
         if body.get("type") == "url_verification":
             challenge = body.get("challenge")
             print(f"Received URL verification challenge: {challenge}")
-            # Return the challenge value as JSON with exact format Slack expects
-            return JSONResponse(
-                content={"challenge": challenge},
+            # Return the challenge value as plain text
+            return Response(
+                content=challenge,
                 status_code=200,
-                headers={"Content-Type": "application/json"}
+                media_type="text/plain"
             )
         
         # Handle events
