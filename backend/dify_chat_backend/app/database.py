@@ -25,9 +25,6 @@ class Conversation(Base):
 
 class SlackWorkspace(Base):
     __tablename__ = "slack_workspaces"
-    __table_args__ = (
-        {'sqlite_on_conflict': 'REPLACE'}  # Upsert behavior for SQLite
-    )
 
     id = Column(String, primary_key=True)  # Workspace/Team ID from Slack
     name = Column(String, nullable=False, index=True)
@@ -44,9 +41,6 @@ class SlackWorkspace(Base):
 
 class SlackChannel(Base):
     __tablename__ = "slack_channels"
-    __table_args__ = (
-        {'sqlite_on_conflict': 'REPLACE'}  # Upsert behavior for SQLite
-    )
 
     id = Column(String, primary_key=True)  # Channel ID from Slack
     name = Column(String, nullable=False, index=True)
@@ -61,9 +55,6 @@ class SlackChannel(Base):
 
 class SlackMessage(Base):
     __tablename__ = "slack_messages"
-    __table_args__ = (
-        {'sqlite_on_conflict': 'REPLACE'}  # Upsert behavior for SQLite
-    )
 
     id = Column(String, primary_key=True)
     channel_id = Column(String, ForeignKey('slack_channels.id', ondelete='CASCADE'), nullable=False, index=True)
