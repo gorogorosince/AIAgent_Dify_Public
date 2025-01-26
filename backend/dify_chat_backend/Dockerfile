@@ -14,12 +14,18 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y sqlite3 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y sqlite3 && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /data && \
+    chown -R nobody:nogroup /data && \
+    chmod 777 /data
 
 COPY --from=builder /app/.venv ./.venv
 COPY --from=builder /app .
 
-RUN mkdir -p /data && chown nobody:nogroup /data
+# Ensure all app files are owned by nobody
+RUN chown -R nobody:nogroup /app
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PORT=8080
