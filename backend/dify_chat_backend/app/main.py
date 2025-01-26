@@ -12,10 +12,11 @@ from dotenv import load_dotenv
 
 from .database import init_db, async_session, Conversation
 from .dify_client import DifyClient
+from .slack_routes import router as slack_router
 
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(title="DifyAIエージェント")
 
 # Disable CORS. Do not remove this for full-stack development.
 app.add_middleware(
@@ -25,6 +26,9 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
+
+# Include Slack routes
+app.include_router(slack_router, prefix="/api", tags=["slack"])
 
 # Initialize Dify client
 dify_client = DifyClient()
