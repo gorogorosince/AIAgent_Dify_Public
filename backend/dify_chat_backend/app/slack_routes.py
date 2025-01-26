@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from .database import async_session
+from sqlalchemy import select
+from .database import async_session, SlackWorkspace, SlackChannel, SlackMessage
 from .slack_client import SlackClient
 import secrets
 import hashlib
 import hmac
 import time
-from typing import Dict
+import uuid
+import json
+from datetime import datetime
+from typing import Dict, Optional, Any
 
 router = APIRouter()
 slack_client = SlackClient()
@@ -126,5 +130,172 @@ async def slack_events(
     if body.get("type") == "url_verification":
         return {"challenge": body["challenge"]}
     
-    # TODO: Handle other event types
+    # Handle events
+    if body.get("type") == "event_callback":
+        event = body.get("event", {})
+        event_type = event.get("type")
+        
+        # Handle both direct messages and app mentions
+        if event_type in ["message", "app_mention"]:
+            # Ignore bot messages and message_changed events
+            if event.get("subtype") in ["bot_message", "message_changed"]:
+                return {"ok": True}
+            
+            # Extract message details
+            channel_id = event.get("channel")
+            user_id = event.get("user")
+            text = event.get("text", "")
+            ts = event.get("ts")
+            thread_ts = event.get("thread_ts")
+            team_id = body.get("team_id")
+            
+            try:
+                # Get workspace and channel info
+                workspace_result = await db.execute(
+                    select(SlackWorkspace).where(SlackWorkspace.id == team_id)
+                )
+                workspace = workspace_result.scalar_one_or_none()
+                
+                if not workspace:
+                    raise HTTPException(status_code=404, detail="Workspace not found")
+                
+                channel_result = await db.execute(
+                    select(SlackChannel).where(
+                        SlackChannel.id == channel_id,
+                        SlackChannel.workspace_id == team_id
+                    )
+                )
+                channel = channel_result.scalar_one_or_none()
+                
+                if not channel:
+                    # Create channel if it doesn't exist
+                    channel = SlackChannel(
+                        id=channel_id,
+                        name=f"channel-{channel_id}",  # Default name
+                        workspace_id=team_id,
+                        is_private=False
+                    )
+                    db.add(channel)
+                
+                # Create SlackMessage record
+                message = SlackMessage(
+                    id=str(uuid.uuid4()),
+                    channel_id=channel_id,
+                    user_id=user_id,
+                    text=text,
+                    ts=ts,
+                    thread_ts=thread_ts,
+                    created_at=datetime.utcnow()
+                )
+                db.add(message)
+                await db.commit()
+                
+                # Store the conversation mapping for future responses
+                if thread_ts:
+                    # If in a thread, use thread_ts as conversation identifier
+                    conversation_id = f"slack-{team_id}-{channel_id}-{thread_ts}"
+                else:
+                    # If not in a thread, create a new conversation
+                    conversation_id = f"slack-{team_id}-{channel_id}-{ts}"
+                
+                message.conversation_id = conversation_id
+                await db.commit()
+                
+                return {"ok": True}
+                
+            except Exception as e:
+                print(f"Error processing message event: {str(e)}")
+                await db.rollback()
+                raise HTTPException(status_code=500, detail=str(e))
+    
+    # Handle slash commands
+    elif body.get("type") == "command":
+        command = body.get("command")
+        text = body.get("text", "").strip()
+        channel_id = body.get("channel_id")
+        user_id = body.get("user_id")
+        team_id = body.get("team_id")
+        
+        try:
+            # Get workspace info
+            workspace_result = await db.execute(
+                select(SlackWorkspace).where(SlackWorkspace.id == team_id)
+            )
+            workspace = workspace_result.scalar_one_or_none()
+            
+            if not workspace:
+                raise HTTPException(status_code=404, detail="Workspace not found")
+            
+            # Create SlackMessage record for the command
+            message = SlackMessage(
+                id=str(uuid.uuid4()),
+                channel_id=channel_id,
+                user_id=user_id,
+                text=f"{command} {text}".strip(),
+                ts=str(time.time()),
+                created_at=datetime.utcnow(),
+                conversation_id=f"slack-{team_id}-{channel_id}-{time.time()}"
+            )
+            db.add(message)
+            await db.commit()
+            
+            return {
+                "response_type": "in_channel",
+                "text": "処理中です..."  # "Processing..."
+            }
+            
+        except Exception as e:
+            print(f"Error processing slash command: {str(e)}")
+            await db.rollback()
+            raise HTTPException(status_code=500, detail=str(e))
+    
     return {"ok": True}
+
+@router.post("/slack/interactivity")
+async def slack_interactivity(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Handle Slack interactive components like buttons and modals."""
+    if not verify_slack_signature(request):
+        raise HTTPException(status_code=401, detail="Invalid request signature")
+    
+    try:
+        form = await request.form()
+        payload = json.loads(form.get("payload", "{}"))
+        
+        # Extract common fields
+        team_id = payload.get("team", {}).get("id")
+        channel_id = payload.get("channel", {}).get("id")
+        user_id = payload.get("user", {}).get("id")
+        action_type = payload.get("type")
+        
+        if team_id and channel_id and user_id:
+            # Get workspace info
+            workspace_result = await db.execute(
+                select(SlackWorkspace).where(SlackWorkspace.id == team_id)
+            )
+            workspace = workspace_result.scalar_one_or_none()
+            
+            if not workspace:
+                raise HTTPException(status_code=404, detail="Workspace not found")
+            
+            # Store interaction in database
+            message = SlackMessage(
+                id=str(uuid.uuid4()),
+                channel_id=channel_id,
+                user_id=user_id,
+                text=f"Interactive action: {action_type}",
+                ts=str(time.time()),
+                created_at=datetime.utcnow(),
+                conversation_id=f"slack-{team_id}-{channel_id}-{time.time()}"
+            )
+            db.add(message)
+            await db.commit()
+        
+        return {"ok": True}
+        
+    except Exception as e:
+        print(f"Error processing interactive component: {str(e)}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
