@@ -19,7 +19,9 @@ class SlackClient:
             "chat:write",
             "channels:read",
             "commands",
-            "incoming-webhook"
+            "incoming-webhook",
+            "im:history",
+            "im:write"
         ]
         
         return (

@@ -10,7 +10,7 @@ import os
 import httpx
 from dotenv import load_dotenv
 
-from .database import init_db, async_session, Conversation
+from .database import init_db, async_session, Conversation, SlackWorkspace, SlackChannel, SlackMessage
 from .dify_client import DifyClient
 from .slack_routes import router as slack_router
 
