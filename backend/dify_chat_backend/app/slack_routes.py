@@ -70,7 +70,11 @@ async def install_slack_app():
     """Generate Slack app installation URL."""
     state = generate_state_param()
     install_url = slack_client.get_install_url(state)
-    return {"install_url": install_url}
+    # Store state for validation
+    state_store[state] = time.time()
+    print(f"Generated state: {state}")
+    print(f"State store contents: {state_store}")
+    return {"install_url": install_url, "state": state}
 
 @router.get("/slack/oauth/callback")
 async def slack_oauth_callback(
@@ -225,12 +229,8 @@ async def slack_events(
                     await db.commit()
                     
                     # Store the conversation mapping for future responses
-                    if thread_ts:
-                        # If in a thread, use thread_ts as conversation identifier
-                        conversation_id = f"slack-{team_id}-{channel_id}-{thread_ts}"
-                    else:
-                        # If not in a thread, create a new conversation
-                        conversation_id = f"slack-{team_id}-{channel_id}-{ts}"
+                    # Generate a UUID for the conversation
+                    conversation_id = str(uuid.uuid4())
                     
                     message.conversation_id = conversation_id
                     await db.commit()
@@ -239,7 +239,7 @@ async def slack_events(
                     try:
                         dify_response = await dify_client.chat(
                             message=text,
-                            conversation_id=message.conversation_id,
+                            conversation_id=conversation_id,  # Use the UUID
                             user_id=user_id,
                             source="slack"
                         )
@@ -297,6 +297,9 @@ async def slack_events(
                     raise HTTPException(status_code=404, detail="Workspace not found")
                 
                 # Create SlackMessage record for the command
+                # Generate a UUID for the conversation
+                conversation_id = str(uuid.uuid4())
+                
                 message = SlackMessage(
                     id=str(uuid.uuid4()),
                     channel_id=channel_id,
@@ -304,7 +307,7 @@ async def slack_events(
                     text=f"{command} {text}".strip(),
                     ts=str(time.time()),
                     created_at=datetime.utcnow(),
-                    conversation_id=f"slack-{team_id}-{channel_id}-{time.time()}"
+                    conversation_id=conversation_id
                 )
                 db.add(message)
                 await db.commit()
@@ -370,6 +373,9 @@ async def slack_interactivity(
                 raise HTTPException(status_code=404, detail="Workspace not found")
             
             # Store interaction in database
+            # Generate a UUID for the conversation
+            conversation_id = str(uuid.uuid4())
+            
             message = SlackMessage(
                 id=str(uuid.uuid4()),
                 channel_id=channel_id,
@@ -377,7 +383,7 @@ async def slack_interactivity(
                 text=f"Interactive action: {action_type}",
                 ts=str(time.time()),
                 created_at=datetime.utcnow(),
-                conversation_id=f"slack-{team_id}-{channel_id}-{time.time()}"
+                conversation_id=conversation_id
             )
             db.add(message)
             await db.commit()

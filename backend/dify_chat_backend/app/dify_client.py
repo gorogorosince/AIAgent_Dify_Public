@@ -22,8 +22,7 @@ class DifyClient:
     ) -> Dict[str, str]:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-            "Accept": "text/event-stream"
+            "Content-Type": "application/json"
         }
         
         # Generate a unique user identifier based on source and user_id
@@ -33,7 +32,7 @@ class DifyClient:
             "inputs": {},
             "query": message,
             "user": user_identifier,
-            "response_mode": "streaming",
+            "response_mode": "blocking",  # Changed to blocking mode
             "conversation_id": conversation_id if conversation_id else None
         }
         
@@ -46,55 +45,28 @@ class DifyClient:
                 print(f"Payload: {payload}")
                 print(f"Headers: {headers}")
                 
-                async with client.stream(
-                    "POST",
+                response = await client.post(
                     endpoint,
                     headers=headers,
                     json=payload,
                     timeout=30.0
-                ) as response:
-                    response.raise_for_status()
-                    
-                    full_response = ""
-                    current_conversation_id = None
-                    
-                    async for line in response.aiter_lines():
-                        print(f"Received line: {line}")
-                        if not line.strip():
-                            continue
-                            
-                        if line.startswith("data: "):
-                            data = line[6:].strip()  # Remove "data: " prefix
-                            if data == "[DONE]":
-                                break
-                                
-                            try:
-                                chunk = json.loads(data)
-                                print(f"Parsed chunk: {chunk}")
-                                if isinstance(chunk, dict):
-                                    message_data = chunk.get("answer", "")
-                                    if message_data:
-                                        full_response += message_data
-                                    
-                                    # Try to get conversation_id from various locations
-                                    if not current_conversation_id:
-                                        current_conversation_id = (
-                                            chunk.get("conversation_id") or
-                                            chunk.get("id") or
-                                            (chunk.get("data", {}).get("conversation_id") if isinstance(chunk.get("data"), dict) else None)
-                                        )
-                            except json.JSONDecodeError as e:
-                                print(f"Error parsing chunk: {e}")
-                                continue
-                    
-                    # If we didn't get a conversation_id, generate one
-                    if not current_conversation_id:
-                        current_conversation_id = str(uuid.uuid4())
-                    
-                    return {
-                        "answer": full_response.strip(),
-                        "conversation_id": current_conversation_id
-                    }
+                )
+                response.raise_for_status()
+                data = response.json()
+                
+                # Extract answer and conversation_id from response
+                answer = data.get("answer", "")
+                current_conversation_id = (
+                    data.get("conversation_id") or
+                    data.get("id") or
+                    conversation_id or
+                    str(uuid.uuid4())
+                )
+                
+                return {
+                    "answer": answer.strip(),
+                    "conversation_id": current_conversation_id
+                }
                     
         except httpx.HTTPError as e:
             print(f"HTTP Error: {str(e)}")
